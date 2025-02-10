@@ -43,9 +43,20 @@
     friction: 0.99     // friction for tangential velocity
   };
 
+  // Blue ball properties
+  const blueBall = {
+    x: center.x,
+    y: center.y + 100,
+    vx: -2,
+    vy: 0,
+    radius: 10,
+    restitution: 0.7,  // bounce factor
+    friction: 0.95     // friction for tangential velocity
+  };
+
   const gravity = 0.2;
 
-  // Compute the hexagon vertices for a given rotation.
+  // Compute the hexagon vertices for a given rotation
   function getHexagonVertices(rotation) {
     const vertices = [];
     for (let i = 0; i < 6; i++) {
@@ -58,23 +69,23 @@
     return vertices;
   }
 
-  // Utility: returns dot product of two vectors.
+  // Utility: returns dot product of two vectors
   function dot(v1, v2) {
     return v1.x * v2.x + v1.y * v2.y;
   }
 
-  // Normalize vector v.
+  // Normalize vector v
   function normalize(v) {
     const mag = Math.hypot(v.x, v.y);
     return { x: v.x / mag, y: v.y / mag };
   }
 
-  // Main animation loop.
+  // Main animation loop
   function animate() {
     requestAnimationFrame(animate);
     ctx.clearRect(0, 0, width, height);
 
-    // Update angular velocity from mouse’s horizontal distance relative to center.
+    // Update angular velocity from mouse’s horizontal distance relative to center
     angularVelocity = (mouse.x - center.x) * sensitivity;
     hexRotation += angularVelocity;
     const vertices = getHexagonVertices(hexRotation);
@@ -95,22 +106,27 @@
     ball.x += ball.vx;
     ball.y += ball.vy;
 
-    // For each edge, ensure the ball is inside.
-    // Since vertices are computed in order (counterclockwise), the interior is to the left of each edge.
+    // Update blue ball physics (gravity and position)
+    blueBall.vy += gravity;
+    blueBall.x += blueBall.vx;
+    blueBall.y += blueBall.vy;
+
+    // For each edge, ensure the ball is inside
+    // Since vertices are computed in order (counterclockwise), the interior is to the left of each edge
     for (let i = 0; i < vertices.length; i++) {
       const A = vertices[i];
       const B = vertices[(i + 1) % vertices.length];
       // Edge vector
       const edge = { x: B.x - A.x, y: B.y - A.y };
-      // Inward normal for a counterclockwise polygon is the left perpendicular.
+      // Inward normal for a counterclockwise polygon is the left perpendicular
       const normal = normalize({ x: -edge.y, y: edge.x });
-      // Compute signed distance from ball center to edge line.
+      // Compute signed distance from ball center to edge line
       const rel = { x: ball.x - A.x, y: ball.y - A.y };
       let distance = dot(rel, normal);
-      // If the ball is too close to (or past) the edge, resolve collision.
+      // If the ball is too close to (or past) the edge, resolve collision
       if (distance < ball.radius) {
         const penetration = ball.radius - distance;
-        // Reposition the ball so it is exactly ball.radius away.
+        // Reposition the ball so it is exactly ball.radius away
         ball.x += normal.x * penetration;
         ball.y += normal.y * penetration;
 
@@ -120,42 +136,71 @@
           y: ball.y - normal.y * ball.radius
         };
 
-        // Wall velocity due to hexagon rotation at the contact point.
+        // Wall velocity due to hexagon rotation at the contact point
         const rx = contactPoint.x - center.x;
         const ry = contactPoint.y - center.y;
         const wallVel = {
           x: -angularVelocity * ry,
-          y:  angularVelocity * rx
+          y: angularVelocity * rx
         };
 
-        // Relative velocity of the ball with respect to the moving wall.
+        // Relative velocity of the ball with respect to the moving wall
         const relVel = { x: ball.vx - wallVel.x, y: ball.vy - wallVel.y };
         const dotRel = dot(relVel, normal);
         if (dotRel < 0) {
-          // Reflect the normal component with restitution.
+          // Reflect the normal component with restitution
           const reflected = {
             x: relVel.x - (1 + ball.restitution) * dotRel * normal.x,
             y: relVel.y - (1 + ball.restitution) * dotRel * normal.y
           };
-          // Apply friction to the tangential component.
-          // Compute the tangential component.
+          // Apply friction to the tangential component
           const tangential = {
             x: reflected.x - dot(reflected, normal) * normal.x,
             y: reflected.y - dot(reflected, normal) * normal.y
           };
           tangential.x *= ball.friction;
           tangential.y *= ball.friction;
-          // Recombine and add back the wall's velocity.
+          // Recombine and add back the wall's velocity
           ball.vx = (reflected.x - (reflected.x - dot(reflected, normal) * normal.x)) + tangential.x + wallVel.x;
           ball.vy = (reflected.y - (reflected.y - dot(reflected, normal) * normal.y)) + tangential.y + wallVel.y;
-          
-          // Alternatively, you can set:
-          // const newRel = {
-          //   x: reflected.x,
-          //   y: reflected.y
-          // };
-          // ball.vx = newRel.x + wallVel.x;
-          // ball.vy = newRel.y + wallVel.y;
+        }
+      }
+
+      // Repeat same process for blue ball
+      const relBlue = { x: blueBall.x - A.x, y: blueBall.y - A.y };
+      let distanceBlue = dot(relBlue, normal);
+      if (distanceBlue < blueBall.radius) {
+        const penetrationBlue = blueBall.radius - distanceBlue;
+        blueBall.x += normal.x * penetrationBlue;
+        blueBall.y += normal.y * penetrationBlue;
+
+        const contactPointBlue = {
+          x: blueBall.x - normal.x * blueBall.radius,
+          y: blueBall.y - normal.y * blueBall.radius
+        };
+
+        const rxBlue = contactPointBlue.x - center.x;
+        const ryBlue = contactPointBlue.y - center.y;
+        const wallVelBlue = {
+          x: -angularVelocity * ryBlue,
+          y: angularVelocity * rxBlue
+        };
+
+        const relVelBlue = { x: blueBall.vx - wallVelBlue.x, y: blueBall.vy - wallVelBlue.y };
+        const dotRelBlue = dot(relVelBlue, normal);
+        if (dotRelBlue < 0) {
+          const reflectedBlue = {
+            x: relVelBlue.x - (1 + blueBall.restitution) * dotRelBlue * normal.x,
+            y: relVelBlue.y - (1 + blueBall.restitution) * dotRelBlue * normal.y
+          };
+          const tangentialBlue = {
+            x: reflectedBlue.x - dot(reflectedBlue, normal) * normal.x,
+            y: reflectedBlue.y - dot(reflectedBlue, normal) * normal.y
+          };
+          tangentialBlue.x *= blueBall.friction;
+          tangentialBlue.y *= blueBall.friction;
+          blueBall.vx = (reflectedBlue.x - (reflectedBlue.x - dot(reflectedBlue, normal) * normal.x)) + tangentialBlue.x + wallVelBlue.x;
+          blueBall.vy = (reflectedBlue.y - (reflectedBlue.y - dot(reflectedBlue, normal) * normal.y)) + tangentialBlue.y + wallVelBlue.y;
         }
       }
     }
@@ -164,6 +209,12 @@
     ctx.beginPath();
     ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
     ctx.fillStyle = '#f00';
+    ctx.fill();
+
+    // Draw the blue ball
+    ctx.beginPath();
+    ctx.arc(blueBall.x, blueBall.y, blueBall.radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#00f';
     ctx.fill();
   }
 
